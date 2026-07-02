@@ -94,8 +94,8 @@ function LoginForm() {
   return (
     <div
       style={{
-        backgroundColor: '#F4845F',
-        fontFamily: 'var(--font-inter), sans-serif',
+        backgroundColor: '#000000',
+        fontFamily: 'var(--font-space-mono), monospace',
       }}
       className="flex-1 flex items-center justify-center p-6 min-h-screen relative overflow-hidden select-none"
     >
@@ -204,7 +204,7 @@ function LoginForm() {
                 type="checkbox"
                 id="rememberMe"
                 {...register('rememberMe')}
-                className="rounded border-white/20 bg-white/5 text-[#F4845F] focus:ring-0 focus:ring-offset-0 h-4 w-4 cursor-pointer"
+                className="rounded border-white/20 bg-white/5 text-black focus:ring-0 focus:ring-offset-0 h-4 w-4 cursor-pointer"
                 disabled={isLoading}
               />
               <label
@@ -217,7 +217,7 @@ function LoginForm() {
 
             <Button
               type="submit"
-              className="w-full bg-white hover:bg-white/90 text-[#F4845F] font-bold py-5 rounded-lg text-xs shadow-lg flex items-center justify-center gap-2 transition-all duration-150 border-none cursor-pointer"
+              className="w-full bg-white hover:bg-white/90 text-black font-bold py-5 rounded-lg text-xs shadow-lg flex items-center justify-center gap-2 transition-all duration-150 border-none cursor-pointer"
               disabled={isLoading}
             >
               {isLoading ? (

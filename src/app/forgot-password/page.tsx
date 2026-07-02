@@ -62,8 +62,8 @@ export default function ForgotPasswordPage() {
     return (
       <div
         style={{
-          backgroundColor: '#F4845F',
-          fontFamily: 'var(--font-inter), sans-serif',
+          backgroundColor: '#000000',
+          fontFamily: 'var(--font-space-mono), monospace',
         }}
         className="flex-1 flex items-center justify-center p-6 min-h-screen relative overflow-hidden"
       >
@@ -109,8 +109,8 @@ export default function ForgotPasswordPage() {
   return (
     <div
       style={{
-        backgroundColor: '#F4845F',
-        fontFamily: 'var(--font-inter), sans-serif',
+        backgroundColor: '#000000',
+        fontFamily: 'var(--font-space-mono), monospace',
       }}
       className="flex-1 flex items-center justify-center p-6 min-h-screen relative overflow-hidden select-none"
     >
@@ -176,7 +176,7 @@ export default function ForgotPasswordPage() {
 
             <Button
               type="submit"
-              className="w-full bg-white hover:bg-white/90 text-[#F4845F] font-bold py-5 rounded-lg text-xs shadow-lg flex items-center justify-center gap-2 transition-all duration-150 border-none cursor-pointer"
+              className="w-full bg-white hover:bg-white/90 text-black font-bold py-5 rounded-lg text-xs shadow-lg flex items-center justify-center gap-2 transition-all duration-150 border-none cursor-pointer"
               disabled={isLoading}
             >
               {isLoading ? (
