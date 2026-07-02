@@ -16,7 +16,8 @@ import {
   Sparkles,
   Github,
   Chrome,
-  AlertTriangle
+  AlertTriangle,
+  ArrowLeft
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -88,29 +89,60 @@ function LoginForm() {
     }
   }
 
-  return (
-    <div className="flex-1 flex items-center justify-center p-6 min-h-[calc(100vh-80px)] relative">
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 left-1/3 w-[250px] h-[250px] bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
+  const grainUri = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E")`
 
-      <Card className="w-full max-w-md bg-slate-950/75 border-white/10 backdrop-blur-xl shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
+  return (
+    <div
+      style={{
+        backgroundColor: '#F4845F',
+        fontFamily: 'var(--font-inter), sans-serif',
+      }}
+      className="flex-1 flex items-center justify-center p-6 min-h-screen relative overflow-hidden select-none"
+    >
+      {/* Grain overlay */}
+      <div
+        style={{
+          backgroundImage: grainUri,
+          backgroundSize: '200px 200px',
+          backgroundRepeat: 'repeat',
+          opacity: 0.4,
+        }}
+        className="absolute inset-0 pointer-events-none z-10"
+      />
+
+      {/* Giant display watermark */}
+      <div
+        style={{
+          top: '20%',
+          fontSize: 'clamp(80px, 18vw, 240px)',
+          fontWeight: 900,
+          lineHeight: 1,
+          opacity: 0.15,
+          letterSpacing: '-0.02em',
+        }}
+        className="absolute inset-x-0 flex items-center justify-center pointer-events-none select-none z-0 font-anton text-white uppercase whitespace-nowrap"
+      >
+        INTERNHQ
+      </div>
+
+      <Card className="w-full max-w-md bg-white/10 border-white/20 backdrop-blur-xl shadow-2xl relative overflow-hidden text-white z-20 rounded-2xl">
+        <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-white/30 to-transparent" />
         
         <CardHeader className="text-center pb-4">
-          <div className="mx-auto h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20 mb-3">
+          <div className="mx-auto h-10 w-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center font-bold text-white shadow-lg mb-3">
             I
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight text-white flex items-center justify-center gap-1.5">
-            Command Portal <Sparkles className="h-4 w-4 text-blue-400" />
+            Command Portal <Sparkles className="h-4 w-4 text-white animate-pulse" />
           </CardTitle>
-          <CardDescription className="text-slate-400 text-xs">
+          <CardDescription className="text-white/80 text-xs">
             Sign in to access your Career Command Center
           </CardDescription>
         </CardHeader>
         
         <CardContent className="space-y-4">
           {errorParam && (
-            <div className="flex items-center gap-2.5 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+            <div className="flex items-center gap-2.5 p-3 rounded-lg bg-rose-500/20 border border-rose-500/30 text-rose-100 text-xs">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span>{errorParam}</span>
             </div>
@@ -118,52 +150,52 @@ function LoginForm() {
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">Email Address</label>
+              <label className="text-xs font-semibold text-white/90">Email Address</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-white/60" />
                 <Input
                   type="email"
                   placeholder="name@university.edu"
                   {...register('email')}
-                  className="pl-10 bg-slate-900/50 border-white/10 text-white placeholder:text-slate-500 focus-visible:ring-blue-500 focus-visible:border-blue-500"
+                  className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/45 focus-visible:ring-0 focus-visible:border-white/40 focus:border-white/40 focus:ring-0"
                   disabled={isLoading}
                 />
               </div>
               {errors.email && (
-                <p className="text-[10px] text-rose-400 font-medium">{errors.email.message}</p>
+                <p className="text-[10px] text-rose-200 font-semibold">{errors.email.message}</p>
               )}
             </div>
 
             <div className="space-y-1.5">
               <div className="flex justify-between items-center">
-                <label className="text-xs font-semibold text-slate-300">Password</label>
+                <label className="text-xs font-semibold text-white/90">Password</label>
                 <Link
                   href="/forgot-password"
-                  className="text-[10px] text-blue-400 hover:text-blue-300 hover:underline transition-colors"
+                  className="text-[10px] text-white/80 hover:text-white hover:underline transition-colors"
                 >
                   Forgot password?
                 </Link>
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-white/60" />
                 <Input
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   {...register('password')}
-                  className="pl-10 pr-10 bg-slate-900/50 border-white/10 text-white placeholder:text-slate-500 focus-visible:ring-blue-500 focus-visible:border-blue-500"
+                  className="pl-10 pr-10 bg-white/5 border-white/10 text-white placeholder:text-white/45 focus-visible:ring-0 focus-visible:border-white/40 focus:border-white/40 focus:ring-0"
                   disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3 top-3 text-slate-500 hover:text-slate-300 transition-colors"
+                  className="absolute right-3 top-3 text-white/60 hover:text-white transition-colors"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
               {errors.password && (
-                <p className="text-[10px] text-rose-400 font-medium">{errors.password.message}</p>
+                <p className="text-[10px] text-rose-200 font-semibold">{errors.password.message}</p>
               )}
             </div>
 
@@ -172,12 +204,12 @@ function LoginForm() {
                 type="checkbox"
                 id="rememberMe"
                 {...register('rememberMe')}
-                className="rounded border-white/10 bg-slate-900/50 text-blue-600 focus:ring-0 focus:ring-offset-0 h-4 w-4 cursor-pointer"
+                className="rounded border-white/20 bg-white/5 text-[#F4845F] focus:ring-0 focus:ring-offset-0 h-4 w-4 cursor-pointer"
                 disabled={isLoading}
               />
               <label
                 htmlFor="rememberMe"
-                className="text-xs text-slate-400 select-none cursor-pointer"
+                className="text-xs text-white/80 select-none cursor-pointer"
               >
                 Remember me for 30 days
               </label>
@@ -185,7 +217,7 @@ function LoginForm() {
 
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold py-5 rounded-lg text-xs shadow-lg shadow-blue-500/10 flex items-center justify-center gap-2"
+              className="w-full bg-white hover:bg-white/90 text-[#F4845F] font-bold py-5 rounded-lg text-xs shadow-lg flex items-center justify-center gap-2 transition-all duration-150 border-none cursor-pointer"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -200,11 +232,11 @@ function LoginForm() {
           </form>
 
           <div className="relative flex py-2 items-center">
-            <div className="flex-grow border-t border-white/5"></div>
-            <span className="flex-shrink mx-4 text-[10px] text-slate-500 font-semibold uppercase tracking-wider">
+            <div className="flex-grow border-t border-white/10"></div>
+            <span className="flex-shrink mx-4 text-[10px] text-white/60 font-semibold uppercase tracking-wider">
               Or continue with
             </span>
-            <div className="flex-grow border-t border-white/5"></div>
+            <div className="flex-grow border-t border-white/10"></div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -212,7 +244,7 @@ function LoginForm() {
               variant="outline"
               type="button"
               onClick={() => handleOAuthLogin('github')}
-              className="border-white/10 bg-slate-900/30 hover:bg-slate-900/80 text-xs flex items-center gap-2"
+              className="border-white/20 bg-white/5 hover:bg-white/15 text-white text-xs flex items-center gap-2 cursor-pointer transition-all duration-150"
               disabled={isLoading}
             >
               <Github className="h-4 w-4" />
@@ -222,21 +254,21 @@ function LoginForm() {
               variant="outline"
               type="button"
               onClick={() => handleOAuthLogin('google')}
-              className="border-white/10 bg-slate-900/30 hover:bg-slate-900/80 text-xs flex items-center gap-2"
+              className="border-white/20 bg-white/5 hover:bg-white/15 text-white text-xs flex items-center gap-2 cursor-pointer transition-all duration-150"
               disabled={isLoading}
             >
-              <Chrome className="h-4 w-4 text-rose-500" />
+              <Chrome className="h-4 w-4 text-white" />
               Google
             </Button>
           </div>
         </CardContent>
         
-        <CardFooter className="justify-center border-t border-white/5 bg-slate-950/40 py-4">
-          <p className="text-xs text-slate-400">
+        <CardFooter className="justify-center border-t border-white/10 bg-white/5 py-4">
+          <p className="text-xs text-white/80">
             Don't have an account?{' '}
             <Link
               href="/signup"
-              className="text-blue-400 hover:text-blue-300 hover:underline transition-colors font-medium"
+              className="text-white font-semibold hover:text-white/90 hover:underline transition-colors"
             >
               Sign up
             </Link>
@@ -248,10 +280,24 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  const grainUri = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E")`
+
   return (
     <Suspense fallback={
-      <div className="flex-1 flex items-center justify-center p-6 min-h-[calc(100vh-80px)]">
-        <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+      <div
+        style={{ backgroundColor: '#F4845F' }}
+        className="flex-1 flex items-center justify-center p-6 min-h-screen relative overflow-hidden"
+      >
+        <div
+          style={{
+            backgroundImage: grainUri,
+            backgroundSize: '200px 200px',
+            backgroundRepeat: 'repeat',
+            opacity: 0.4,
+          }}
+          className="absolute inset-0 pointer-events-none z-10"
+        />
+        <Loader2 className="h-8 w-8 text-white animate-spin z-20" />
       </div>
     }>
       <LoginForm />

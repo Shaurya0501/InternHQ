@@ -39,20 +39,20 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen bg-slate-950 overflow-hidden text-slate-100">
+    <div className="flex h-screen bg-black overflow-hidden text-white font-mono dashboard-theme" style={{ fontFamily: 'var(--font-space-mono), monospace' }}>
       {/* Sidebar Navigation */}
       <Sidebar profile={studentProfile} />
 
       {/* Main Workspace Frame */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Glow behind main viewport */}
-        <div className="absolute top-0 right-1/4 w-[400px] h-[400px] bg-blue-600/5 rounded-full blur-[120px] pointer-events-none z-0" />
+        <div className="absolute top-0 right-1/4 w-[400px] h-[400px] bg-white/5 rounded-full blur-[120px] pointer-events-none z-0" />
         
         {/* Top Header Controls */}
         <TopNav profile={studentProfile} />
 
         {/* Viewport Content */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-8 relative z-10 scrollbar-thin scrollbar-thumb-slate-800">
+        <main className="flex-1 overflow-y-auto p-6 md:p-8 relative z-10 scrollbar-thin scrollbar-thumb-white/20">
           <div className="max-w-5xl mx-auto space-y-8">
             {children}
           </div>

@@ -55,25 +55,33 @@ export async function updateSession(request: NextRequest) {
   }
 
   // If user is logged in:
-  // Fetch their profile to check onboarding status
-  const { data: profile } = await supabase
+  // Fetch their profile to check onboarding status and role
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('onboarded')
+    .select('onboarded, role')
     .eq('id', user.id)
     .single()
 
-  const isOnboarded = profile?.onboarded === true
+  console.log('MIDDLEWARE DIAGNOSTICS:', {
+    path,
+    userId: user.id,
+    profile,
+    profileError: profileError ? { message: profileError.message, code: profileError.code } : null
+  })
 
-  if (!isOnboarded) {
-    // Authenticated but NOT onboarded. They should only be allowed on /onboarding or public homepage.
+  const isOnboarded = profile?.onboarded === true
+  const role = profile?.role || 'student'
+
+  if (!isOnboarded && role === 'student') {
+    // Authenticated student but NOT onboarded. They should only be allowed on /onboarding or public homepage.
     if (path !== '/onboarding' && !path.startsWith('/auth/') && path !== '/') {
       const url = request.nextUrl.clone()
       url.pathname = '/onboarding'
       return NextResponse.redirect(url)
     }
   } else {
-    // Authenticated and onboarded.
-    // If they try to visit login, signup, forgot-password, or onboarding, redirect to dashboard.
+    // Authenticated and onboarded (or recruiter/admin).
+    // If they try to visit login, signup, forgot-password, or onboarding, redirect to their role dashboard.
     if (
       path === '/login' ||
       path === '/signup' ||
@@ -81,8 +89,49 @@ export async function updateSession(request: NextRequest) {
       path === '/onboarding'
     ) {
       const url = request.nextUrl.clone()
-      url.pathname = '/dashboard'
+      if (role === 'recruiter') {
+        url.pathname = '/recruiter'
+      } else if (role === 'admin') {
+        url.pathname = '/admin'
+      } else {
+        url.pathname = '/dashboard'
+      }
       return NextResponse.redirect(url)
+    }
+
+    // Protect Student pages
+    if (path.startsWith('/dashboard') || path.startsWith('/community')) {
+      if (role === 'recruiter') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/recruiter'
+        return NextResponse.redirect(url)
+      } else if (role === 'admin') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/admin'
+        return NextResponse.redirect(url)
+      }
+    }
+
+    // Protect Recruiter pages
+    if (path.startsWith('/recruiter')) {
+      if (role === 'student') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/dashboard'
+        return NextResponse.redirect(url)
+      } else if (role === 'admin') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/admin'
+        return NextResponse.redirect(url)
+      }
+    }
+
+    // Protect Admin pages
+    if (path.startsWith('/admin')) {
+      if (role !== 'admin') {
+        const url = request.nextUrl.clone()
+        url.pathname = role === 'recruiter' ? '/recruiter' : '/dashboard'
+        return NextResponse.redirect(url)
+      }
     }
   }
 

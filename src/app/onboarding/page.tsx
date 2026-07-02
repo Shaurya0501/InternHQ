@@ -199,13 +199,20 @@ export default function OnboardingPage() {
     if (!userId) return
     setIsLoading(true)
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast.error('Session expired. Please log in again.')
+        router.push('/login')
+        return
+      }
+      const activeUserId = user.id
       let avatarUrl = ''
       let resumeUrl = ''
 
       // 1. Upload Avatar if exists
       if (avatarFile) {
         const fileExt = avatarFile.name.split('.').pop()
-        const filePath = `${userId}/avatar.${fileExt}`
+        const filePath = `${activeUserId}/avatar.${fileExt}`
         const { error: uploadError } = await supabase.storage
           .from('avatars')
           .upload(filePath, avatarFile, { upsert: true })
@@ -213,7 +220,6 @@ export default function OnboardingPage() {
         if (!uploadError) {
           avatarUrl = supabase.storage.from('avatars').getPublicUrl(filePath).data.publicUrl
         } else {
-          // If avatars bucket is not created, fallback to placeholder url
           console.warn('Avatars upload failed (bucket might be missing):', uploadError.message)
           avatarUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(data.fullName)}`
         }
@@ -224,7 +230,7 @@ export default function OnboardingPage() {
       // 2. Upload Resume if exists
       if (resumeFile) {
         const fileExt = resumeFile.name.split('.').pop()
-        const filePath = `${userId}/resume.${fileExt}`
+        const filePath = `${activeUserId}/resume.${fileExt}`
         const { error: uploadError } = await supabase.storage
           .from('resumes')
           .upload(filePath, resumeFile, { upsert: true })
@@ -237,10 +243,11 @@ export default function OnboardingPage() {
         }
       }
 
-      // 3. Update Profiles Table
+      // 3. Upsert Profiles Table (Insert if missing, otherwise Update)
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: activeUserId,
           full_name: data.fullName,
           university: data.university,
           degree: data.degree,
@@ -256,13 +263,12 @@ export default function OnboardingPage() {
           onboarded: true,
           updated_at: new Date().toISOString()
         })
-        .eq('id', userId)
 
       if (updateError) {
         toast.error(updateError.message)
       } else {
         toast.success('Onboarding complete! Loading command dashboard.')
-        router.refresh() // Clear router session state
+        router.refresh()
         router.push('/dashboard')
       }
     } catch (err: any) {

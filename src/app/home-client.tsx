@@ -1,935 +1,765 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { User } from '@supabase/supabase-js'
 import {
-  ArrowRight,
-  Sparkles,
-  LayoutDashboard,
-  Shield,
-  Zap,
-  Compass,
-  CheckCircle,
-  HelpCircle,
-  Github,
-  Linkedin,
-  Globe,
-  Star
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import './home.css'
+  motion,
+  useScroll,
+  useTransform,
+  useSpring,
+  useMotionTemplate
+} from 'framer-motion'
 
 interface HomeClientProps {
   user: User | null
 }
 
-interface Particle {
-  x: number
-  y: number
-  vx: number
-  vy: number
-  size: number
-  opacity: number
+const SCRAMBLE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+~|}{[]:;?><'
+
+// 1. ScrambleIn component
+interface ScrambleInProps {
+  text: string
+  delay: number
+  triggered: boolean
 }
 
-export function HomeClient({ user }: HomeClientProps) {
-  // Refs for HTML Elements
-  const videoCanvasRef = useRef<HTMLCanvasElement | null>(null)
-  const videoFallbackRef = useRef<HTMLVideoElement | null>(null)
-  const particlesCanvasRef = useRef<HTMLCanvasElement | null>(null)
-  const heroRef = useRef<HTMLDivElement | null>(null)
-  const cardsTriggerRef = useRef<HTMLDivElement | null>(null)
-  const fixedCardsRef = useRef<HTMLDivElement | null>(null)
-  const cardsGridRef = useRef<HTMLDivElement | null>(null)
-  const sectionThreeInnerRef = useRef<HTMLDivElement | null>(null)
-
-  // Video state refs to prevent re-triggering effects
-  const framesRef = useRef<ImageBitmap[]>([])
-  const framesReadyRef = useRef<boolean>(false)
-  const lastFrameIndexRef = useRef<number>(-1)
-  const videoSeekingRef = useRef<boolean>(false)
-  
-  // Animation frame cancels
-  const videoRafRef = useRef<number | null>(null)
-  const particlesRafRef = useRef<number | null>(null)
-  const cardsRafRef = useRef<number | null>(null)
-
-  const VIDEO_URL = 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260616_212935_bbf608da-62d1-4f25-9be4-c346e4d09cc8.mp4'
-
-  // Pricing & features mock data from original page.tsx
-  const features = [
-    {
-      icon: <Sparkles className="h-6 w-6 text-blue-400" />,
-      title: 'Career Command Center',
-      description: 'Ditch the spreadsheets. Track applications, networking, and offers from one Unified Command dashboard.'
-    },
-    {
-      icon: <Zap className="h-6 w-6 text-purple-400" />,
-      title: 'Intelligent Profiles',
-      description: 'Your digital career twin. Sync your skills, graduation dates, and resumes to auto-match opportunities.'
-    },
-    {
-      icon: <Compass className="h-6 w-6 text-emerald-400" />,
-      title: 'Journey Tracker',
-      description: 'Visualize every stage of your recruitment funnel, from initial application to signed offer letter.'
-    },
-    {
-      icon: <Shield className="h-6 w-6 text-rose-400" />,
-      title: 'Secure & Verified',
-      description: 'Your resume and academic history are protected by strict Row-Level Security and encryption policies.'
-    }
-  ]
-
-  const steps = [
-    {
-      number: '01',
-      title: 'Deploy Profile',
-      description: 'Input your academic credentials, technical skills, and career interests into your profile dashboard.'
-    },
-    {
-      number: '02',
-      title: 'Synchronize Resumes',
-      description: 'Upload your resumes and link GitHub/LinkedIn. Build a comprehensive portfolio of your accomplishments.'
-    },
-    {
-      number: '03',
-      title: 'Track Funnel',
-      description: 'Organize interviews, complete technical assessments, and log feedback as you advance through cycles.'
-    },
-    {
-      number: '04',
-      title: 'Secure the Offer',
-      description: 'Compare multiple compensation offers side-by-side and launch your engineering career.'
-    }
-  ]
-
-  const pricingTiers = [
-    {
-      name: 'Pilot',
-      price: '$0',
-      description: 'Essential command tools for student developers.',
-      features: [
-        'Single Active Profile',
-        'Standard Application Tracking',
-        'Command Palette Navigation',
-        'Email Verification Protection',
-        'Community Support access'
-      ],
-      cta: 'Initialize Account',
-      popular: false
-    },
-    {
-      name: 'Command Pro',
-      price: '$12',
-      period: '/mo',
-      description: 'For candidates aiming for top-tier tech offers.',
-      features: [
-        'Everything in Pilot tier',
-        'Unlimited Active Resumes',
-        'Priority OAuth Login access',
-        'Advanced Application Metrics',
-        'Mock Interview scheduler',
-        'Priority Server support'
-      ],
-      cta: 'Go Command Pro',
-      popular: true
-    }
-  ]
-
-  const faqs = [
-    {
-      question: 'Is InternHQ an internship listing board?',
-      answer: 'No. InternHQ is a Career Command Center. Instead of browsing static job feeds, InternHQ helps you organize, track, and optimize your entire applications funnel from initial discovery to final offer.'
-    },
-    {
-      question: 'How does the command palette work?',
-      answer: 'Pressing Cmd+K (or Ctrl+K) triggers the command palette overlay anywhere on the platform, allowing you to search pages, trigger actions, and run profile configuration commands quickly.'
-    },
-    {
-      question: 'Is my student data secure?',
-      answer: 'Absolutely. We utilize Supabase Row Level Security (RLS) policies. Your profile data and resume assets can only be accessed or modified by you.'
-    },
-    {
-      question: 'Can I import my existing spreadsheet tracker?',
-      answer: 'Yes! In the upcoming updates of Phase 2, you will be able to import CSV trackers directly into your Command dashboard with auto-matching columns.'
-    }
-  ]
+export function ScrambleIn({ text, delay, triggered }: ScrambleInProps) {
+  const [displayText, setDisplayText] = useState('')
+  const [isStarted, setIsStarted] = useState(false)
 
   useEffect(() => {
-    // --------------------- RESIZE CANVAS ---------------------
-    const canvas = videoCanvasRef.current
-    const videoEl = videoFallbackRef.current
-    if (!canvas || !videoEl) return
-
-    const ctx = canvas.getContext('2d')
-
-    function resizeCanvas() {
-      if (!canvas) return
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      const rect = canvas.getBoundingClientRect()
-      const w = Math.round(rect.width * dpr)
-      const h = Math.round(rect.height * dpr)
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w
-        canvas.height = h
-      }
-      lastFrameIndexRef.current = -1
+    if (!triggered) {
+      setDisplayText('')
+      return
     }
 
-    resizeCanvas()
-    window.addEventListener('resize', resizeCanvas)
+    const startTimeout = setTimeout(() => {
+      setIsStarted(true)
+    }, delay)
 
-    // --------------------- SCROLL VIDEO FRAMES ---------------------
-    async function extractFrames() {
-      try {
-        const response = await fetch(VIDEO_URL, { mode: 'cors' })
-        const blob = await response.blob()
-        const objectUrl = URL.createObjectURL(blob)
+    return () => clearTimeout(startTimeout)
+  }, [triggered, delay])
 
-        const video = document.createElement('video')
-        video.muted = true
-        video.preload = 'auto'
-        video.playsInline = true
-        video.crossOrigin = 'anonymous'
-        video.src = objectUrl
+  useEffect(() => {
+    if (!isStarted) return
 
-        await new Promise<void>((resolve, reject) => {
-          video.onloadedmetadata = () => resolve()
-          video.onerror = () => reject()
-          setTimeout(() => reject(new Error('Timeout loading metadata')), 15000)
-        })
+    let frame = 0
+    const charsPerFrame = 0.5
+    const totalLength = text.length
 
-        const scale = Math.min(1, 1280 / video.videoWidth)
-        const scaledWidth = Math.round(video.videoWidth * scale)
-        const scaledHeight = Math.round(video.videoHeight * scale)
-        const frameCount = Math.max(30, Math.min(120, Math.round(video.duration * 24)))
+    const interval = setInterval(() => {
+      frame++
+      const revealIndex = Math.floor(frame * charsPerFrame)
 
-        const tempFrames: ImageBitmap[] = []
-        for (let i = 0; i < frameCount; i++) {
-          const time = (i / (frameCount - 1)) * (video.duration - 0.05)
-          video.currentTime = time
-          await new Promise<void>((resolve, reject) => {
-            const onSeeked = () => {
-              video.removeEventListener('seeked', onSeeked)
-              resolve()
-            }
-            video.addEventListener('seeked', onSeeked)
-            setTimeout(() => {
-              video.removeEventListener('seeked', onSeeked)
-              reject(new Error('Timeout seeked'))
-            }, 3000)
-          })
-          const bitmap = await createImageBitmap(video, {
-            resizeWidth: scaledWidth,
-            resizeHeight: scaledHeight
-          })
-          tempFrames.push(bitmap)
-        }
-
-        if (tempFrames.length > 0 && canvas && videoEl) {
-          framesRef.current = tempFrames
-          framesReadyRef.current = true
-          canvas.style.visibility = 'visible'
-          videoEl.style.display = 'none'
-        }
-        URL.revokeObjectURL(objectUrl)
-      } catch (e) {
-        console.warn('Frame extraction failed, falling back to seek method:', e)
-      }
-    }
-
-    function getScrollBounds() {
-      const vh = window.innerHeight
-      return { start: vh * 0.5, end: document.documentElement.scrollHeight - vh }
-    }
-
-    function getProgress() {
-      const { start, end } = getScrollBounds()
-      const range = end - start
-      if (range <= 0) return 0
-      return Math.max(0, Math.min(1, (window.scrollY - start) / range))
-    }
-
-    function drawFrame(frame: ImageBitmap) {
-      if (!canvas || !ctx) return
-      const cw = canvas.width
-      const ch = canvas.height
-      const s = Math.max(cw / frame.width, ch / frame.height)
-      const dw = frame.width * s
-      const dh = frame.height * s
-      ctx.drawImage(frame, (cw - dw) / 2, (ch - dh) / 2, dw, dh)
-    }
-
-    function videoTick() {
-      const progress = getProgress()
-      if (framesReadyRef.current && framesRef.current.length > 0) {
-        const idx = Math.round(progress * (framesRef.current.length - 1))
-        if (idx !== lastFrameIndexRef.current) {
-          lastFrameIndexRef.current = idx
-          const frame = framesRef.current[idx]
-          if (frame) drawFrame(frame)
-        }
-      } else if (videoEl && videoEl.duration && isFinite(videoEl.duration) && videoEl.readyState >= 1) {
-        const target = progress * videoEl.duration
-        if (!videoSeekingRef.current && Math.abs(videoEl.currentTime - target) > 0.001) {
-          videoSeekingRef.current = true
-          videoEl.currentTime = target
-        }
-      }
-      videoRafRef.current = requestAnimationFrame(videoTick)
-    }
-
-    const onSeeked = () => {
-      videoSeekingRef.current = false
-    }
-    const onStalled = () => {
-      videoSeekingRef.current = false
-    }
-    const onLoadedData = () => {
-      if (videoEl) videoEl.currentTime = 0
-    }
-
-    videoEl.addEventListener('seeked', onSeeked)
-    videoEl.addEventListener('stalled', onStalled)
-    videoEl.addEventListener('loadeddata', onLoadedData)
-
-    if (canvas) canvas.style.visibility = 'hidden'
-
-    videoRafRef.current = requestAnimationFrame(videoTick)
-    extractFrames()
-
-    // --------------------- PARTICLES ---------------------
-    const pCanvas = particlesCanvasRef.current
-    if (!pCanvas) return
-
-    const pCtx = pCanvas.getContext('2d')
-    let particles: Particle[] = []
-
-    function resizeParticles() {
-      if (!pCanvas) return
-      pCanvas.width = window.innerWidth
-      pCanvas.height = window.innerHeight
-      createParticles()
-    }
-
-    function createParticles() {
-      if (!pCanvas) return
-      particles = []
-      const count = Math.floor((pCanvas.width * pCanvas.height) / 12000)
-      for (let i = 0; i < count; i++) {
-        particles.push({
-          x: Math.random() * pCanvas.width,
-          y: Math.random() * pCanvas.height,
-          vx: (Math.random() - 0.5) * 0.3,
-          vy: (Math.random() - 0.5) * 0.3,
-          size: Math.random() * 1.5 + 0.5,
-          opacity: Math.random() * 0.6 + 0.2
-        })
-      }
-    }
-
-    function animateParticles() {
-      if (!pCanvas || !pCtx) return
-      pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height)
-      for (const p of particles) {
-        p.x += p.vx
-        p.y += p.vy
-        if (p.x < 0) p.x = pCanvas.width
-        if (p.x > pCanvas.width) p.x = 0
-        if (p.y < 0) p.y = pCanvas.height
-        if (p.y > pCanvas.height) p.y = 0
-        pCtx.beginPath()
-        pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
-        pCtx.fillStyle = `rgba(255, 255, 255, ${p.opacity})`
-        pCtx.fill()
-      }
-      particlesRafRef.current = requestAnimationFrame(animateParticles)
-    }
-
-    resizeParticles()
-    window.addEventListener('resize', resizeParticles)
-    particlesRafRef.current = requestAnimationFrame(animateParticles)
-
-    // --------------------- HERO OPACITY FADE ---------------------
-    function updateHeroOpacity() {
-      const hero = heroRef.current
-      if (!hero) return
-      const fade = Math.max(0, 1 - window.scrollY / (window.innerHeight * 0.3))
-      hero.style.opacity = fade.toString()
-    }
-    window.addEventListener('scroll', updateHeroOpacity, { passive: true })
-
-    // --------------------- FIXED CARDS MASK REVEAL ---------------------
-    function tickCards() {
-      const trigger = cardsTriggerRef.current
-      const fixedCards = fixedCardsRef.current
-      const cardsGrid = cardsGridRef.current
-      if (!trigger || !fixedCards || !cardsGrid) {
-        cardsRafRef.current = requestAnimationFrame(tickCards)
+      if (revealIndex >= totalLength) {
+        setDisplayText(text)
+        clearInterval(interval)
         return
       }
 
-      const rect = trigger.getBoundingClientRect()
-      const triggerTop = rect.top + window.scrollY
-      const triggerHeight = rect.height
-      const scrollY = window.scrollY
-      const vh = window.innerHeight
-
-      const start = triggerTop - vh * 0.5
-      const end = triggerTop + triggerHeight - vh * 0.3
-      const range = end - start
-
-      let progress = range > 0 ? (scrollY - start) / range : 0
-      progress = Math.max(0, Math.min(1, progress))
-
-      const isActive = scrollY >= start - vh * 0.2 && scrollY <= end + vh * 0.3
-      const fadeIn = Math.min(1, Math.max(0, (scrollY - (start - vh * 0.2)) / (vh * 0.2)))
-      const fadeOut = Math.min(1, Math.max(0, (end + vh * 0.3 - scrollY) / (vh * 0.3)))
-      const containerOpacity = isActive ? Math.min(fadeIn, fadeOut) : 0
-
-      fixedCards.style.opacity = containerOpacity.toString()
-      fixedCards.style.pointerEvents = containerOpacity > 0.1 ? 'auto' : 'none'
-
-      const isMobile = window.innerWidth < 768
-      const revealPct = progress * 130
-      const maskGradient = isMobile
-        ? `linear-gradient(to bottom, black ${revealPct}%, transparent ${revealPct + 20}%)`
-        : `linear-gradient(to right, black ${revealPct}%, transparent ${revealPct + 15}%)`
-
-      cardsGrid.style.maskImage = maskGradient
-      cardsGrid.style.webkitMaskImage = maskGradient
-
-      cardsRafRef.current = requestAnimationFrame(tickCards)
-    }
-    cardsRafRef.current = requestAnimationFrame(tickCards)
-
-    // --------------------- SECTION 3 INTERSECTION ---------------------
-    const sectionInner = sectionThreeInnerRef.current
-    let observer: IntersectionObserver | null = null
-
-    if (sectionInner) {
-      observer = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting) {
-            sectionInner.classList.add('visible')
-            if (observer) observer.unobserve(sectionInner)
-          }
-        },
-        { threshold: 0.15 }
-      )
-      observer.observe(sectionInner)
-    }
-
-    // --------------------- CLEANUP ---------------------
-    return () => {
-      window.removeEventListener('resize', resizeCanvas)
-      window.removeEventListener('resize', resizeParticles)
-      window.removeEventListener('scroll', updateHeroOpacity)
-      if (videoEl) {
-        videoEl.removeEventListener('seeked', onSeeked)
-        videoEl.removeEventListener('stalled', onStalled)
-        videoEl.removeEventListener('loadeddata', onLoadedData)
-      }
-      if (observer && sectionInner) {
-        observer.unobserve(sectionInner)
-      }
-      if (videoRafRef.current) cancelAnimationFrame(videoRafRef.current)
-      if (particlesRafRef.current) cancelAnimationFrame(particlesRafRef.current)
-      if (cardsRafRef.current) cancelAnimationFrame(cardsRafRef.current)
-
-      // Close all ImageBitmaps to free up CPU memory
-      const currentFrames = framesRef.current
-      currentFrames.forEach((frame) => {
-        try {
-          frame.close()
-        } catch {
-          // ignore already closed bitmaps
+      let result = ''
+      for (let i = 0; i < totalLength; i++) {
+        if (text[i] === ' ') {
+          result += ' '
+          continue
         }
-      })
+
+        if (i < revealIndex) {
+          result += text[i]
+        } else if (i < revealIndex + 3) {
+          result += SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)]
+        } else {
+          // empty
+        }
+      }
+      setDisplayText(result)
+    }, 25)
+
+    return () => clearInterval(interval)
+  }, [isStarted, text])
+
+  if (!triggered) {
+    return <span>&nbsp;</span>
+  }
+
+  return <span>{displayText || '\u00A0'}</span>
+}
+
+// 2. ScrambleText component
+interface ScrambleTextProps {
+  text: string
+  isHovered: boolean
+  className?: string
+}
+
+export function ScrambleText({ text, isHovered, className }: ScrambleTextProps) {
+  const [displayText, setDisplayText] = useState(text)
+
+  useEffect(() => {
+    if (!isHovered) {
+      setDisplayText(text)
+      return
     }
+
+    let frame = 0
+    const framesPerChar = 4
+    const totalLength = text.length
+
+    const interval = setInterval(() => {
+      frame++
+      const revealIndex = Math.floor(frame / framesPerChar)
+
+      if (revealIndex >= totalLength) {
+        setDisplayText(text)
+        clearInterval(interval)
+        return
+      }
+
+      let result = ''
+      for (let i = 0; i < totalLength; i++) {
+        if (text[i] === ' ') {
+          result += ' '
+          continue
+        }
+
+        if (i < revealIndex) {
+          result += text[i]
+        } else {
+          result += SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)]
+        }
+      }
+      setDisplayText(result)
+    }, 25)
+
+    return () => clearInterval(interval)
+  }, [isHovered, text])
+
+  return <span className={className}>{displayText}</span>
+}
+
+// 3. Custom SVG Logo component
+interface LogoProps {
+  className?: string
+}
+
+export function SynapseXLogo({ className }: LogoProps) {
+  return (
+    <svg viewBox="-50 -50 100 100" className={className} fill="currentColor">
+      <path d="M 1.5,23 L 1.5,33 C 1.5,38.5 6,43 11.5,43 L 16.5,43 C 22,43 26.5,38.5 26.5,33 Q 28,28 33,26.5 C 38.5,26.5 43,22 43,16.5 L 43,11.5 C 43,6 38.5,1.5 33,1.5 L 23,1.5 Q 12,12 1.5,23 Z" />
+      <path d="M 1.5,23 L 1.5,33 C 1.5,38.5 6,43 11.5,43 L 16.5,43 C 22,43 26.5,38.5 26.5,33 Q 28,28 33,26.5 C 38.5,26.5 43,22 43,16.5 L 43,11.5 C 43,6 38.5,1.5 33,1.5 L 23,1.5 Q 12,12 1.5,23 Z" transform="rotate(90)" />
+      <path d="M 1.5,23 L 1.5,33 C 1.5,38.5 6,43 11.5,43 L 16.5,43 C 22,43 26.5,38.5 26.5,33 Q 28,28 33,26.5 C 38.5,26.5 43,22 43,16.5 L 43,11.5 C 43,6 38.5,1.5 33,1.5 L 23,1.5 Q 12,12 1.5,23 Z" transform="rotate(180)" />
+      <path d="M 1.5,23 L 1.5,33 C 1.5,38.5 6,43 11.5,43 L 16.5,43 C 22,43 26.5,38.5 26.5,33 Q 28,28 33,26.5 C 38.5,26.5 43,22 43,16.5 L 43,11.5 C 43,6 38.5,1.5 33,1.5 L 23,1.5 Q 12,12 1.5,23 Z" transform="rotate(270)" />
+    </svg>
+  )
+}
+
+// 4. SquashHamburger component
+interface HamburgerProps {
+  isOpen: boolean
+  onClick: () => void
+}
+
+export function SquashHamburger({ isOpen, onClick }: HamburgerProps) {
+  return (
+    <button
+      onClick={onClick}
+      className="relative flex flex-col justify-center items-center focus:outline-none cursor-pointer w-[15px] h-[10px] sm:w-[18px] sm:h-[12px]"
+      aria-label="Toggle menu"
+    >
+      <motion.span
+        animate={isOpen ? { rotate: 45, y: 0 } : { rotate: 0, y: -4 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+        className="absolute w-full bg-white h-[1.2px] sm:h-[1.5px]"
+      />
+      <motion.span
+        animate={isOpen ? { opacity: 0, scale: 0 } : { opacity: 1, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+        className="absolute w-full bg-white h-[1.2px] sm:h-[1.5px]"
+      />
+      <motion.span
+        animate={isOpen ? { rotate: -45, y: 0 } : { rotate: 0, y: 4 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+        className="absolute w-full bg-white h-[1.2px] sm:h-[1.5px]"
+      />
+    </button>
+  )
+}
+
+export function HomeClient({ user }: HomeClientProps) {
+  const [entranceComplete, setEntranceComplete] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [hoveredLink, setHoveredLink] = useState<string | null>(null)
+  const [hoveredDl, setHoveredDl] = useState(false)
+
+  // References for mouse scrub video
+  const heroVideoRef = useRef<HTMLVideoElement | null>(null)
+  const isSeeking = useRef(false)
+  const targetTime = useRef(0)
+
+  // Trigger entrance complete state after 800ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setEntranceComplete(true)
+    }, 800)
+    return () => clearTimeout(timer)
   }, [])
 
+  // Mouse scrubbing handler for Video 1
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const video = heroVideoRef.current
+    if (!video || !video.duration || isNaN(video.duration)) return
+
+    const percent = e.clientX / window.innerWidth
+    // Sensitivity factor 0.8
+    targetTime.current = percent * video.duration * 0.8
+
+    if (!isSeeking.current) {
+      isSeeking.current = true
+      video.currentTime = targetTime.current
+    }
+  }
+
+  const handleSeeked = () => {
+    const video = heroVideoRef.current
+    if (!video) return
+
+    if (Math.abs(video.currentTime - targetTime.current) > 0.05) {
+      video.currentTime = targetTime.current
+    } else {
+      isSeeking.current = false
+    }
+  }
+
+  // Section 2 scroll references and calculations
+  const section2Ref = useRef<HTMLDivElement | null>(null)
+  const { scrollYProgress: scrollYSection2 } = useScroll({
+    target: section2Ref,
+    offset: ["start end", "end start"]
+  })
+
+  const ySpring = useSpring(scrollYSection2, {
+    stiffness: 15,
+    damping: 32,
+    mass: 1.8
+  })
+
+  const yScaleValue = useTransform(ySpring, [0, 1], [60, -120])
+  const opacitySection2 = useTransform(ySpring, [0.3, 0.5], [0, 1])
+  const transformStyle = useMotionTemplate`perspective(400px) rotateX(24deg) translateY(${yScaleValue}px) translateZ(15px)`
+
+  // Smooth scroll helper
+  const scrollTo = (heightMultiplier: number) => {
+    window.scrollTo({
+      top: window.innerHeight * heightMultiplier,
+      behavior: 'smooth'
+    })
+    setMenuOpen(false)
+  }
+
   return (
-    <div className="relative min-h-screen bg-slate-950 text-slate-100 selection:bg-blue-500/30 selection:text-blue-200">
+    <div
+      style={{ fontFamily: '"Space Mono", monospace' }}
+      className="relative min-h-screen bg-black text-white overflow-x-hidden selection:bg-white/20 selection:text-white"
+    >
       
-      {/* Scroll Video Background */}
-      <div id="scroll-video-container">
-        <canvas ref={videoCanvasRef} id="video-canvas"></canvas>
+      {/* NAVBAR */}
+      <motion.header
+        initial={{ opacity: 0 }}
+        animate={entranceComplete ? { opacity: 1 } : { opacity: 0 }}
+        transition={{ duration: 0.8 }}
+        className="fixed top-0 left-0 right-0 h-20 z-50 flex items-center px-4 sm:px-6 md:px-8 select-none pointer-events-none"
+      >
+        <div className="w-full flex items-center justify-between pointer-events-auto gap-2">
+          {/* Logo pill */}
+          <motion.div
+            animate={{
+              width: menuOpen ? 0 : 'auto',
+              opacity: menuOpen ? 0 : 1,
+              marginRight: menuOpen ? 0 : 8
+            }}
+            transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+            whileHover={{ scale: 1.02, backgroundColor: 'rgba(255, 255, 255, 0.22)' }}
+            whileTap={{ scale: 0.98 }}
+            className="h-9 sm:h-12 bg-white/15 backdrop-blur-md rounded-[10px] sm:rounded-[14px] flex items-center gap-2 sm:gap-2.5 overflow-hidden cursor-pointer shrink-0"
+            style={{ paddingLeft: menuOpen ? 0 : 20, paddingRight: menuOpen ? 0 : 20 }}
+          >
+            <SynapseXLogo className="h-4.5 w-4.5 text-white" />
+            <span className="text-[13px] sm:text-[16px] font-medium tracking-tight text-white whitespace-nowrap">
+              InternHQ
+            </span>
+          </motion.div>
+
+          {/* Expanding menu pill */}
+          <motion.div
+            animate={{
+              flexGrow: menuOpen ? 1 : 0,
+              width: menuOpen ? 'auto' : '48px'
+            }}
+            transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+            className="h-9 sm:h-12 rounded-[10px] sm:rounded-[14px] bg-white/15 backdrop-blur-md flex items-center justify-between overflow-hidden"
+          >
+            {/* Hamburger Button */}
+            <div
+              className={`flex items-center justify-center rounded-[10px] sm:rounded-[14px] transition-colors cursor-pointer shrink-0 ${
+                menuOpen
+                  ? 'w-[30px] h-[30px] sm:w-[36px] sm:h-[36px] bg-white/10 hover:bg-white/20 ml-1.5'
+                  : 'w-[48px] h-full'
+              }`}
+            >
+              <SquashHamburger isOpen={menuOpen} onClick={() => setMenuOpen(!menuOpen)} />
+            </div>
+
+            {/* Nav links */}
+            {menuOpen && (
+              <motion.div
+                initial={{ opacity: 0, x: 15 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1, duration: 0.3 }}
+                className="flex items-center gap-4 sm:gap-6 pl-4 pr-6 text-[13px] sm:text-[16px] overflow-hidden"
+              >
+                <button
+                  onClick={() => scrollTo(1)}
+                  onMouseEnter={() => setHoveredLink('about')}
+                  onMouseLeave={() => setHoveredLink(null)}
+                  className="font-normal text-white/85 hover:text-white cursor-pointer bg-transparent border-none p-0 focus:outline-none"
+                >
+                  <ScrambleText text="About" isHovered={hoveredLink === 'about'} />
+                </button>
+                <button
+                  onClick={() => scrollTo(2)}
+                  onMouseEnter={() => setHoveredLink('metrics')}
+                  onMouseLeave={() => setHoveredLink(null)}
+                  className="font-normal text-white/85 hover:text-white cursor-pointer bg-transparent border-none p-0 focus:outline-none"
+                >
+                  <ScrambleText text="Metrics" isHovered={hoveredLink === 'metrics'} />
+                </button>
+                
+                {/* Console entry */}
+                {user ? (
+                  <Link
+                    href="/dashboard"
+                    onMouseEnter={() => setHoveredLink('console')}
+                    onMouseLeave={() => setHoveredLink(null)}
+                    className="font-bold text-white/85 hover:text-white cursor-pointer"
+                  >
+                    <ScrambleText text="Console" isHovered={hoveredLink === 'console'} />
+                  </Link>
+                ) : (
+                  <Link
+                    href="/login"
+                    onMouseEnter={() => setHoveredLink('portal')}
+                    onMouseLeave={() => setHoveredLink(null)}
+                    className="font-bold text-white/85 hover:text-white cursor-pointer"
+                  >
+                    <ScrambleText text="Portal" isHovered={hoveredLink === 'portal'} />
+                  </Link>
+                )}
+              </motion.div>
+            )}
+          </motion.div>
+
+          {/* Spacer when closed to push CTA to the right */}
+          {!menuOpen && <div className="flex-1 shrink-0" />}
+
+          {/* Right: Dashboard Redirection Button */}
+          <motion.div
+            animate={{
+              width: menuOpen ? 0 : 'auto',
+              opacity: menuOpen ? 0 : 1,
+              marginLeft: menuOpen ? 0 : 8
+            }}
+            transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+            className="overflow-hidden shrink-0"
+          >
+            {user ? (
+              <motion.div
+                onMouseEnter={() => setHoveredDl(true)}
+                onMouseLeave={() => setHoveredDl(false)}
+                whileHover={{ scale: 1.03, backgroundColor: '#e2e2e6' }}
+                whileTap={{ scale: 0.97 }}
+                className="h-9 sm:h-12 px-3.5 sm:px-6 bg-white rounded-full flex items-center justify-center text-black cursor-pointer text-[13px] sm:text-[16px] font-semibold"
+              >
+                <Link href="/dashboard">
+                  <ScrambleText text="Go to Dashboard" isHovered={hoveredDl} />
+                </Link>
+              </motion.div>
+            ) : (
+              <motion.div
+                onMouseEnter={() => setHoveredDl(true)}
+                onMouseLeave={() => setHoveredDl(false)}
+                whileHover={{ scale: 1.03, backgroundColor: '#e2e2e6' }}
+                whileTap={{ scale: 0.97 }}
+                className="h-9 sm:h-12 px-3.5 sm:px-6 bg-white rounded-full flex items-center justify-center text-black cursor-pointer text-[13px] sm:text-[16px] font-semibold"
+              >
+                <Link href="/signup">
+                  <ScrambleText text="Get Started" isHovered={hoveredDl} />
+                </Link>
+              </motion.div>
+            )}
+          </motion.div>
+        </div>
+      </motion.header>
+
+
+      {/* SECTION 1: HERO */}
+      <div
+        onMouseMove={handleMouseMove}
+        className="relative w-full h-screen h-[100dvh] flex flex-col justify-end overflow-hidden"
+      >
+        {/* Background mouse-scrubbed video */}
         <video
-          ref={videoFallbackRef}
-          id="video-fallback"
+          ref={heroVideoRef}
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_083515_290e5a10-0b95-41af-a5e2-32b6389baa4d.mp4"
+          onSeeked={handleSeeked}
+          className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none select-none"
           muted
           playsInline
           preload="auto"
-          crossOrigin="anonymous"
-          src={VIDEO_URL}
-        ></video>
-        <div className="overlay"></div>
-      </div>
+        />
 
-      {/* Particles Canvas */}
-      <canvas ref={particlesCanvasRef} id="particles-canvas"></canvas>
+        {/* Dot grid overlay */}
+        <div
+          style={{
+            backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)',
+            backgroundSize: '24px 24px',
+            opacity: 0.05,
+          }}
+          className="absolute inset-0 pointer-events-none z-10"
+        />
 
-      {/* Header / Nav */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-slate-950/70 backdrop-blur-md px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
-            I
-          </div>
-          <span className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-            InternHQ
-          </span>
-        </Link>
-        <nav className="hidden md:flex items-center gap-8 text-sm text-slate-400">
-          <a href="#features" className="hover:text-slate-200 transition-colors">Features</a>
-          <a href="#workflow" className="hover:text-slate-200 transition-colors">How It Works</a>
-          <a href="#pricing" className="hover:text-slate-200 transition-colors">Pricing</a>
-          <a href="#faq" className="hover:text-slate-200 transition-colors">FAQ</a>
-          {user ? (
-            <Link href="/dashboard" className="hover:text-slate-200 transition-colors">Get Started</Link>
-          ) : (
-            <Link href="/signup" className="hover:text-slate-200 transition-colors">Get Started</Link>
-          )}
-        </nav>
-        <div className="flex items-center gap-4">
-          {user ? (
-            <Link href="/dashboard">
-              <Button variant="outline" className="border-white/10 hover:bg-white/5 flex items-center gap-2 text-xs">
-                <LayoutDashboard className="h-4 w-4 text-blue-400" />
-                Go to Dashboard
-              </Button>
-            </Link>
-          ) : (
-            <>
-              <Link href="/login" className="text-sm text-slate-400 hover:text-slate-200 transition-colors">
-                Sign In
-              </Link>
-              <Link href="/signup">
-                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-medium text-xs rounded-lg shadow-lg shadow-blue-500/10">
-                  Get Started
-                </Button>
-              </Link>
-            </>
-          )}
+        {/* Watermark text */}
+        <div
+          style={{
+            top: '50%',
+            transform: 'translateY(-50%) translateY(50px)',
+            fontSize: 'clamp(120px, 30vw, 521px)',
+            fontWeight: 400,
+            letterSpacing: '-4px',
+            opacity: 0.10,
+            background: 'radial-gradient(circle, rgba(142,127,148,0) 0%, #8E7F94 70%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}
+          className="absolute inset-x-0 flex items-center justify-center font-anton-sc uppercase text-center select-none z-2 pointer-events-none whitespace-nowrap"
+        >
+          INTERNHQ
         </div>
-      </header>
 
-      {/* Fixed Cards Overlay (Reveals on scroll trigger) */}
-      <div ref={fixedCardsRef} id="fixed-cards">
-        <div ref={cardsGridRef} className="grid-container">
-          <div className="card-item">
-            <h3>Explore InternHQ</h3>
-            <p>
-              InternHQ merges application tracking with modern, simple organization tools. It&apos;s crafted to be clear and customizable while remaining intuitive and easy to use.
-            </p>
-          </div>
-          <div className="card-item">
-            <h3>Unlock Opportunities</h3>
-            <p>
-              The search for internships can be overwhelming. InternHQ offers a centralized dashboard to manage your applications and timeline from application to final offer.
-            </p>
-          </div>
-          <div className="card-item">
-            <h3>Connect Everything</h3>
-            <p>
-              InternHQ comes with tools for resume tracking, interview scheduling, and contact logs to make landing your next role simple and straightforward.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Scroller Content */}
-      <div id="main-scroller">
-        
-        {/* Section 1: Hero */}
-        <section ref={heroRef} id="hero-section">
-          <div className="gradient-overlay"></div>
-          <div className="hero-content">
-            <div className="max-w-6xl mx-auto text-center">
-              <h1 className="text-6xl md:text-8xl lg:text-9xl font-bold text-white mb-12 select-none" style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', letterSpacing: '-0.02em', background: 'linear-gradient(to right, #ffffff, #cbd5e1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                InternHQ
+        {/* Hero content */}
+        <div className="relative z-20 px-4 sm:px-6 md:px-8 pt-20 sm:pt-24 pb-8 sm:pb-12 max-w-full">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={entranceComplete ? { opacity: 1 } : { opacity: 0 }}
+            transition={{ duration: 1.0 }}
+            className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between"
+          >
+            {/* Left column */}
+            <div className="flex flex-col gap-4">
+              <h1 className="text-white font-light leading-[0.95] tracking-[-0.03em] text-[clamp(40px,10vw,100px)]">
+                <ScrambleIn text="Command" delay={200} triggered={entranceComplete} />
+                <br />
+                <ScrambleIn text="Console" delay={500} triggered={entranceComplete} />
               </h1>
-              <div className="flex flex-col sm:flex-row items-center gap-4 justify-center">
+              <motion.p
+                initial={{ y: 25, opacity: 0 }}
+                animate={entranceComplete ? { y: 0, opacity: 1 } : { y: 25, opacity: 0 }}
+                transition={{ duration: 0.9, ease: [0.215, 0.610, 0.355, 1.000], delay: 0.2 }}
+                className="max-w-md text-[13px] sm:text-[15px] text-white/60 leading-relaxed mb-4"
+              >
+                InternHQ merges application tracking, resume cataloging, and interview scheduling into a single unified workspace. Optimize your recruiting funnel and secure top engineering offers.
+              </motion.p>
+              
+              {/* Dashboard buttons inside Hero section */}
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={entranceComplete ? { y: 0, opacity: 1 } : { y: 20, opacity: 0 }}
+                transition={{ duration: 0.9, delay: 0.3 }}
+                className="flex items-center gap-3"
+              >
                 {user ? (
-                  <Link href="/dashboard">
-                    <Button className="bg-blue-600 hover:bg-blue-500 text-white font-medium text-base px-10 py-6 rounded-xl flex items-center gap-2 shadow-lg shadow-blue-500/15 transition-all duration-200">
-                      Go to Dashboard <ArrowRight className="h-4 w-4" />
-                    </Button>
+                  <Link href="/dashboard" className="h-11 px-6 bg-white hover:bg-white/90 text-black font-semibold rounded-lg text-xs flex items-center justify-center transition-all duration-150 cursor-pointer">
+                    Go to Dashboard
                   </Link>
                 ) : (
                   <>
-                    <Link href="/signup">
-                      <Button className="bg-blue-600 hover:bg-blue-500 text-white font-medium text-base px-10 py-6 rounded-xl flex items-center gap-2 shadow-lg shadow-blue-500/15 transition-all duration-200">
-                        Get Started <ArrowRight className="h-4 w-4" />
-                      </Button>
+                    <Link href="/signup" className="h-11 px-6 bg-white hover:bg-white/90 text-black font-semibold rounded-lg text-xs flex items-center justify-center transition-all duration-150 cursor-pointer">
+                      Get Started
                     </Link>
-                    <Link href="/login">
-                      <Button variant="outline" className="border-white/10 hover:bg-white/5 text-slate-300 font-medium text-base px-10 py-6 rounded-xl transition-all duration-200">
-                        Sign In
-                      </Button>
+                    <Link href="/login" className="h-11 px-6 border-2 border-white hover:bg-white/10 text-white font-semibold rounded-lg text-xs flex items-center justify-center transition-all duration-150 cursor-pointer">
+                      Sign In
                     </Link>
                   </>
                 )}
-              </div>
-            </div>
-          </div>
-          <div className="bounce-arrow">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-            </svg>
-          </div>
-        </section>
-
-        {/* Scroll triggers and content spacers */}
-        <div style={{ height: '150vh' }}></div>
-
-        {/* Cards Trigger Zone */}
-        <div ref={cardsTriggerRef} id="cards-trigger" style={{ height: '200vh' }}></div>
-
-        <div style={{ height: '100vh' }}></div>
-
-        {/* Section 3 Presentation */}
-        <section id="section-three">
-          <div ref={sectionThreeInnerRef} className="inner">
-            <p>Presenting</p>
-            <h2>InternHQ Console 1.0</h2>
-            <p className="mt-6 text-sm md:text-base text-slate-400 max-w-xl mx-auto leading-relaxed">
-              InternHQ is a centralized career organizer designed for students. It consolidates application tracking, contact logs, resume versions, and interview schedules into a single place so you can secure your next role without the stress.
-            </p>
-          </div>
-        </section>
-
-        {/* Dashboard Mockup Showcase Section */}
-        <section className="relative py-24 px-6 flex flex-col items-center text-center">
-          <div className="w-full max-w-5xl rounded-2xl border border-white/10 bg-slate-900/30 p-2 shadow-2xl backdrop-blur-md relative group">
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 opacity-10 blur-xl group-hover:opacity-15 transition duration-1000" />
-            <div className="rounded-xl border border-white/5 bg-slate-950/80 overflow-hidden aspect-[16/10] flex flex-col">
-              {/* Window bar */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-slate-900/40">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-rose-500/80" />
-                  <span className="w-3 h-3 rounded-full bg-amber-500/80" />
-                  <span className="w-3 h-3 rounded-full bg-emerald-500/80" />
-                </div>
-                <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2 bg-slate-950 border border-white/5 px-3 py-1 rounded-md">
-                  <span>internhq.com/dashboard</span>
-                </div>
-                <div className="w-14" />
-              </div>
-              
-              {/* Inner Content Placeholder Mockup */}
-              <div className="flex-1 grid grid-cols-5 text-left text-xs bg-slate-950/60 p-4 gap-4 overflow-hidden">
-                {/* Sidebar Mock */}
-                <div className="col-span-1 border-r border-white/5 pr-4 flex flex-col gap-4">
-                  <div className="h-6 w-24 rounded bg-slate-800" />
-                  <div className="flex flex-col gap-2">
-                    <div className="h-8 rounded bg-blue-500/10 border border-blue-500/20 flex items-center px-2 gap-2 text-[10px]">
-                      <div className="w-2 h-2 rounded-full bg-blue-500" />
-                      <span>Overview</span>
-                    </div>
-                    <div className="h-8 rounded hover:bg-white/5 flex items-center px-2 gap-2 text-[10px] text-slate-500">
-                      <div className="w-2 h-2 rounded-full bg-slate-800" />
-                      <span>Applications</span>
-                    </div>
-                    <div className="h-8 rounded hover:bg-white/5 flex items-center px-2 gap-2 text-[10px] text-slate-500">
-                      <div className="w-2 h-2 rounded-full bg-slate-800" />
-                      <span>Interviews</span>
-                    </div>
-                    <div className="h-8 rounded hover:bg-white/5 flex items-center px-2 gap-2 text-[10px] text-slate-500">
-                      <div className="w-2 h-2 rounded-full bg-slate-800" />
-                      <span>Resumes</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Main Workspace Mock */}
-                <div className="col-span-4 flex flex-col gap-4 overflow-hidden">
-                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                    <div className="flex flex-col gap-1">
-                      <div className="h-4 w-32 rounded bg-slate-800" />
-                      <div className="h-3 w-48 rounded bg-slate-900" />
-                    </div>
-                    <div className="h-8 w-24 rounded bg-slate-900 border border-white/5" />
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="border border-white/5 bg-slate-900/40 p-3 rounded-lg flex flex-col gap-2">
-                      <span className="text-[10px] text-slate-500">Applications Sent</span>
-                      <span className="text-xl font-bold font-mono">14</span>
-                      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500 rounded-full w-[45%]" />
-                      </div>
-                    </div>
-                    <div className="border border-white/5 bg-slate-900/40 p-3 rounded-lg flex flex-col gap-2">
-                      <span className="text-[10px] text-slate-500">Interview Rate</span>
-                      <span className="text-xl font-bold font-mono">32.8%</span>
-                      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-purple-500 rounded-full w-[65%]" />
-                      </div>
-                    </div>
-                    <div className="border border-white/5 bg-slate-900/40 p-3 rounded-lg flex flex-col gap-2">
-                      <span className="text-[10px] text-slate-500">Active Offers</span>
-                      <span className="text-xl font-bold font-mono">2</span>
-                      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500 rounded-full w-[25%]" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Welcome Card Mock */}
-                  <div className="flex-1 border border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center p-8 text-center bg-slate-950">
-                    <Sparkles className="h-8 w-8 text-blue-500 mb-2 animate-bounce" />
-                    <p className="font-semibold text-sm text-slate-200">Your internship journey starts here.</p>
-                    <p className="text-[10px] text-slate-500 mt-1 max-w-sm">
-                      Complete onboarding and sync your details to deploy your personalized dashboard tracking panel.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Features Section */}
-        <section id="features" className="py-24 border-t border-white/5 bg-slate-950/80 relative backdrop-blur-md">
-          <div className="max-w-6xl mx-auto px-6">
-            <div className="text-center max-w-2xl mx-auto mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
-                Engineered for the Modern Student
-              </h2>
-              <p className="text-slate-400">
-                The tools you need to secure top offers in tech. Integrated database tracking, elegant UI workflows, and profile syncing.
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {features.map((feature, i) => (
-                <Card key={i} className="bg-slate-900/40 border-white/5 hover:border-white/10 p-6 backdrop-blur-md hover:bg-slate-900/60 transition-all duration-300 relative group flex flex-col gap-4">
-                  <div className="absolute inset-0 rounded-lg bg-gradient-to-b from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition duration-300" />
-                  <div className="p-3 bg-white/5 rounded-lg w-fit">
-                    {feature.icon}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-base mb-1.5 text-slate-200">{feature.title}</h3>
-                    <p className="text-xs text-slate-400 leading-relaxed">{feature.description}</p>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Workflow Section */}
-        <section id="workflow" className="py-24 border-t border-white/5 bg-slate-900/40 backdrop-blur-md">
-          <div className="max-w-6xl mx-auto px-6">
-            <div className="text-center max-w-2xl mx-auto mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
-                How InternHQ Commands Your Search
-              </h2>
-              <p className="text-slate-400">
-                Four structured phases that take you from initial preparation to signed compensation sheets.
-              </p>
+              </motion.div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 relative">
-              <div className="hidden md:block absolute top-10 left-12 right-12 h-0.5 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-transparent z-0" />
-              {steps.map((step, i) => (
-                <div key={i} className="flex flex-col gap-4 z-10 relative">
-                  <div className="text-3xl font-extrabold font-mono bg-clip-text text-transparent bg-gradient-to-b from-blue-500 to-purple-600 w-fit">
-                    {step.number}
-                  </div>
-                  <h3 className="font-bold text-base text-slate-200">{step.title}</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed">{step.description}</p>
-                </div>
-              ))}
+            {/* Right column */}
+            <div className="text-left md:text-right">
+              <h1 className="text-white font-light leading-[0.95] tracking-[-0.03em] text-[clamp(40px,10vw,100px)]">
+                <ScrambleIn text="Career" delay={700} triggered={entranceComplete} />
+                <br />
+                <ScrambleIn text="Pipeline" delay={1000} triggered={entranceComplete} />
+              </h1>
             </div>
-          </div>
-        </section>
-
-        {/* Testimonials */}
-        <section className="py-24 border-t border-white/5 bg-slate-950/80 backdrop-blur-md">
-          <div className="max-w-6xl mx-auto px-6">
-            <div className="text-center max-w-2xl mx-auto mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
-                Approved by Student Engineers
-              </h2>
-              <p className="text-slate-400">
-                See how students from top universities landed software engineering internships using command consoles.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[
-                {
-                  quote: "InternHQ completely streamlined my summer cycle. I logged every technical round and could see which resume versions fetched responses.",
-                  author: "Alex Rivera",
-                  role: "SWE Intern @ Vercel",
-                  school: "Stanford University"
-                },
-                {
-                  quote: "Spreadsheets are too slow and lack integrations. Having my GitHub, portfolio links, and files linked to a command interface saved hours.",
-                  author: "Tariq Mahmood",
-                  role: "Platform Intern @ Stripe",
-                  school: "Carnegie Mellon"
-                },
-                {
-                  quote: "The interface is incredible. It looks like Vercel and Linear had a baby. The keyboard-driven shortcuts make logging updates super satisfying.",
-                  author: "Sasha Gusev",
-                  role: "Frontend Intern @ Framer",
-                  school: "MIT"
-                }
-              ].map((t, i) => (
-                <Card key={i} className="bg-slate-900/30 border-white/5 p-6 backdrop-blur-md hover:bg-slate-900/50 transition duration-300 flex flex-col justify-between gap-6">
-                  <div className="flex gap-1 text-yellow-500">
-                    {[...Array(5)].map((_, idx) => <Star key={idx} className="h-4 w-4 fill-current" />)}
-                  </div>
-                  <p className="text-xs text-slate-300 italic leading-relaxed">&ldquo;{t.quote}&rdquo;</p>
-                  <div className="border-t border-white/5 pt-4 flex flex-col">
-                    <span className="font-semibold text-xs text-slate-200">{t.author}</span>
-                    <span className="text-[10px] text-slate-400 mt-0.5">{t.role}</span>
-                    <span className="text-[9px] text-slate-500 font-mono mt-0.5">{t.school}</span>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Pricing Section */}
-        <section id="pricing" className="py-24 border-t border-white/5 bg-slate-900/20 backdrop-blur-md">
-          <div className="max-w-6xl mx-auto px-6">
-            <div className="text-center max-w-2xl mx-auto mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
-                Predictable Command Tiers
-              </h2>
-              <p className="text-slate-400">
-                Start for free with essential tools, or unlock priority console features.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
-              {pricingTiers.map((tier, idx) => (
-                <Card
-                  key={idx}
-                  className={`bg-slate-900/40 border-white/5 hover:border-white/10 p-8 flex flex-col justify-between relative group ${
-                    tier.popular ? 'border-blue-500/30 shadow-2xl shadow-blue-500/5' : ''
-                  }`}
-                >
-                  {tier.popular && (
-                    <Badge className="absolute top-4 right-4 bg-gradient-to-r from-blue-500 to-purple-600 border-none text-white text-[9px] py-0.5 font-bold uppercase tracking-wider">
-                      Most Popular
-                    </Badge>
-                  )}
-                  <div>
-                    <h3 className="font-bold text-lg text-slate-200">{tier.name}</h3>
-                    <div className="flex items-baseline gap-1 mt-4">
-                      <span className="text-4xl font-extrabold font-mono text-white">{tier.price}</span>
-                      {tier.period && <span className="text-sm text-slate-400">{tier.period}</span>}
-                    </div>
-                    <p className="text-xs text-slate-400 mt-2 leading-relaxed">{tier.description}</p>
-                    
-                    <ul className="space-y-3 mt-6 border-t border-white/5 pt-6 text-xs text-slate-300">
-                      {tier.features.map((feat, fIdx) => (
-                        <li key={fIdx} className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-blue-500 shrink-0" />
-                          <span>{feat}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  
-                  <div className="mt-8">
-                    <Link href={user ? '/dashboard' : '/signup'}>
-                      <Button className={`w-full font-semibold py-5 rounded-lg text-xs ${
-                        tier.popular
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg hover:from-blue-500 hover:to-purple-500'
-                          : 'bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300'
-                      }`}>
-                        {tier.cta}
-                      </Button>
-                    </Link>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* FAQ Section */}
-        <section id="faq" className="py-24 border-t border-white/5 bg-slate-950/80 backdrop-blur-md">
-          <div className="max-w-4xl mx-auto px-6">
-            <div className="text-center max-w-2xl mx-auto mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
-                Frequently Queried Questions
-              </h2>
-              <p className="text-slate-400">
-                Clear, transparent answers to questions regarding Phase 1 and data infrastructure.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {faqs.map((faq, idx) => (
-                <Card key={idx} className="bg-slate-900/30 border-white/5 p-6 hover:bg-slate-900/40 transition duration-150">
-                  <div className="flex items-start gap-3">
-                    <HelpCircle className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
-                    <div>
-                      <h3 className="font-semibold text-sm text-slate-200">{faq.question}</h3>
-                      <p className="text-xs text-slate-400 mt-2 leading-relaxed">{faq.answer}</p>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Call to Action Banner */}
-        <section className="py-20 border-t border-white/5 bg-gradient-to-b from-slate-950 to-slate-900 relative px-6 text-center">
-          <div className="max-w-4xl mx-auto border border-white/10 bg-slate-950/60 p-12 rounded-3xl relative overflow-hidden backdrop-blur-md shadow-2xl">
-            <div className="absolute -top-32 -left-32 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-32 -right-32 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
-            
-            <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-4 leading-tight">
-              Take Command of Your Career Funnel
-            </h2>
-            <p className="text-xs md:text-sm text-slate-400 max-w-lg mx-auto mb-8">
-              Deploy your dashboard panel in 2 minutes. Fill in your details, synchronise your skills, and secure your tech internship.
-            </p>
-            <Link href={user ? '/dashboard' : '/signup'}>
-              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold px-8 py-5 rounded-xl text-xs md:text-sm flex items-center gap-2 mx-auto shadow-lg shadow-blue-500/15">
-                Start Your Journey
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-        </section>
-
-        {/* Footer */}
-        <footer className="border-t border-white/5 py-12 px-6 bg-slate-950 text-slate-500 text-xs">
-          <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center font-bold text-white text-[10px]">
-                I
-              </div>
-              <span className="font-bold text-sm text-slate-300">InternHQ</span>
-              <span className="text-[10px] text-slate-600 ml-2 font-mono">v1.0 (Phase 1 Console)</span>
-            </div>
-            
-            <div className="flex items-center gap-6">
-              <a href="#" className="hover:text-slate-300 transition-colors"><Github className="h-4 w-4" /></a>
-              <a href="#" className="hover:text-slate-300 transition-colors"><Linkedin className="h-4 w-4" /></a>
-              <a href="#" className="hover:text-slate-300 transition-colors"><Globe className="h-4 w-4" /></a>
-            </div>
-            
-            <div>
-              &copy; {new Date().getFullYear()} InternHQ Technologies Inc. All rights reserved.
-            </div>
-          </div>
-        </footer>
+          </motion.div>
+        </div>
       </div>
+
+
+      {/* SECTION 2: CINEMATIC TEXT */}
+      <div
+        ref={section2Ref}
+        className="relative w-full h-screen h-[100dvh] flex items-center justify-center overflow-hidden"
+      >
+        {/* Autoplay loop video background */}
+        <video
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_092455_089c54f8-3b03-4966-9df1-e9746063d0ef.mp4"
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none select-none"
+        />
+
+        {/* Top gradient overlay */}
+        <div
+          style={{
+            background: 'linear-gradient(to bottom, #000000, transparent)',
+            height: '180px',
+          }}
+          className="absolute top-0 left-0 right-0 z-10 pointer-events-none"
+        />
+
+        {/* Text content with 3D perspective scroll effect */}
+        <motion.div
+          style={{
+            transform: transformStyle,
+            opacity: opacitySection2,
+          }}
+          className="relative z-20 max-w-5xl px-6 sm:px-12 text-center"
+        >
+          <p className="font-sans font-normal text-[22px] sm:text-[30px] md:text-[36px] lg:text-[42px] text-white leading-[1.35] tracking-[-0.02em] select-none">
+            A career command console built for the next generation of student developers. InternHQ translates your applications, interviews, and portfolio signals into a structured recruitment pipeline. Every connection becomes measurable, searchable, and visible. It continuously reconstructs your candidate profile as a dynamic career map. Administrative noise is filtered into actionable timeline alerts.
+          </p>
+        </motion.div>
+      </div>
+
+
+      {/* SECTION 3: METRICS */}
+      <div className="relative w-full min-h-screen flex items-center justify-center overflow-hidden">
+        {/* Autoplay loop video background */}
+        <video
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_095810_ecea3dd2-fc5e-4e41-8696-4219290b6589.mp4"
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none select-none"
+        />
+
+        {/* Content */}
+        <div className="relative z-20 pt-32 pb-32 px-6 w-full max-w-6xl">
+          <motion.p
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 1.2 }}
+            className="text-white/40 text-[13px] sm:text-[14px] tracking-[0.2em] uppercase mb-20 text-center"
+          >
+            PLACEMENT ASSURANCE
+          </motion.p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-16 md:gap-8">
+            {[
+              { val: '100%', label: 'Placement Guarantee' },
+              { val: '100%', label: 'Verified Career Success' },
+              { val: '100%', label: 'Interview Conversion' }
+            ].map((m, i) => (
+              <motion.div
+                key={i}
+                initial={{ y: 30, opacity: 0 }}
+                whileInView={{ y: 0, opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8, delay: i * 0.15 }}
+                className="flex flex-col items-center text-center"
+              >
+                <span className="text-white text-[clamp(48px,10vw,96px)] font-light tracking-[-0.04em] leading-none">
+                  {m.val}
+                </span>
+                <span className="text-white/40 text-[13px] sm:text-[15px] mt-4 tracking-wide font-sans">
+                  {m.label}
+                </span>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+
+      {/* SECTION 4: TECHNOLOGY / ADAPTIVE INTELLIGENCE */}
+      <div className="relative w-full h-screen h-[100dvh] flex flex-col justify-between overflow-hidden">
+        {/* Autoplay loop video background */}
+        <video
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_095750_32a52ce0-2005-45c9-9093-41f03fde9530.mp4"
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none select-none"
+        />
+
+        {/* Content grid */}
+        <div className="relative z-20 px-8 sm:px-12 md:px-16 py-12 sm:py-16 h-full flex flex-col justify-between">
+          {/* Top area */}
+          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-6">
+            <motion.h2
+              initial={{ y: 40, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 1.0 }}
+              className="text-white font-light text-[clamp(36px,8vw,72px)] leading-[0.95] tracking-[-0.03em]"
+            >
+              Pipeline
+              <br />
+              Intelligence
+            </motion.h2>
+            <motion.p
+              initial={{ y: 20, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 1.0, delay: 0.2 }}
+              className="text-white/50 text-[13px] sm:text-[15px] leading-relaxed max-w-xs md:text-right md:pt-2"
+            >
+              The dashboard syncs your academic and career details within minutes. From there, every application cycle is tracked, logged, and organized in real time.
+            </motion.p>
+          </div>
+
+          <div className="flex-1" />
+
+          {/* Bottom grid */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 1.0, delay: 0.3 }}
+            className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-6"
+          >
+            {[
+              { title: 'Funnel Mapping', desc: 'Real-time pipeline tracker showing every recruitment stage from start to offer.' },
+              { title: 'OAuth Syncing', desc: 'Syncs your schedules, emails, and interview invitations.' },
+              { title: 'Timeline Alerts', desc: 'Anticipates interview preparation tasks before deadlines arrive.' },
+              { title: 'Closed-Loop Feedback', desc: 'Refines resume versions based on response feedback metrics.' }
+            ].map((item, i) => (
+              <motion.div
+                key={i}
+                initial={{ y: 20, opacity: 0 }}
+                whileInView={{ y: 0, opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.7, delay: i * 0.1 }}
+                className="flex flex-col"
+              >
+                <h3 className="text-white text-[14px] sm:text-[16px] font-normal mb-2">
+                  {item.title}
+                </h3>
+                <p className="text-white/40 text-[12px] sm:text-[14px] leading-relaxed">
+                  {item.desc}
+                </p>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </div>
+
+
+      {/* SECTION 5: ARCHITECTURE (Pure black, no video) */}
+      <div className="relative w-full min-h-screen bg-black flex items-center justify-center overflow-hidden">
+        <div className="relative z-20 w-full max-w-3xl px-6 py-32 text-center">
+          {/* Heading block */}
+          <motion.div
+            initial={{ y: 30, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true, amount: 0.4 }}
+            transition={{ duration: 1.0 }}
+            className="flex flex-col items-center"
+          >
+            <span className="text-white/40 text-[13px] sm:text-[14px] tracking-[0.2em] uppercase mb-8">
+              Platform Architecture
+            </span>
+            <h2 className="text-white font-light text-[clamp(28px,6vw,56px)] leading-[1.15] tracking-[-0.02em] mb-10">
+              Three layers. Zero spreadsheets.
+            </h2>
+            <p className="text-white/45 text-[15px] sm:text-[17px] leading-relaxed max-w-xl mx-auto">
+              Database layer secures candidate assets. Pipeline layer isolates application stages. Console layer delivers keyboard-driven controls to accelerate updates.
+            </p>
+          </motion.div>
+
+          {/* Layer Cards */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, amount: 0.4 }}
+            transition={{ duration: 1.2, delay: 0.4 }}
+            className="mt-20 flex flex-col items-center gap-4 w-full"
+          >
+            {[
+              { idx: 'Layer 1', label: 'Secure Vault' },
+              { idx: 'Layer 2', label: 'Funnel Command' },
+              { idx: 'Layer 3', label: 'Keyboard Control' }
+            ].map((layer, i) => (
+              <div
+                key={i}
+                className="w-full max-w-md h-[72px] border border-white/10 rounded-lg flex items-center justify-between px-6 bg-transparent"
+              >
+                <span className="text-white/30 text-[12px] tracking-[0.15em] uppercase">
+                  {layer.idx}
+                </span>
+                <span className="text-white text-[16px] sm:text-[18px] font-light font-sans">
+                  {layer.label}
+                </span>
+              </div>
+            ))}
+          </motion.div>
+        </div>
+      </div>
+
+
+      {/* FOOTER */}
+      <footer className="relative w-full bg-black overflow-hidden select-none">
+        <div className="flex flex-col md:flex-row min-h-[400px]">
+          {/* Left panel: loop video */}
+          <div className="relative w-full md:w-1/2 h-[300px] md:h-auto overflow-hidden">
+            <video
+              src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_080203_fd7f4f85-3a86-4837-8192-85e7bfe68e75.mp4"
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none select-none"
+            />
+          </div>
+
+          {/* Right panel: content */}
+          <div className="w-full md:w-1/2 flex flex-col justify-between p-10 sm:p-16">
+            <div>
+              {/* Logo block */}
+              <div className="flex items-center gap-2 mb-8 text-white/70">
+                <SynapseXLogo className="h-4.5 w-4.5" />
+                <span className="text-[15px] font-medium tracking-tight">InternHQ</span>
+              </div>
+              <p className="text-white/40 text-[14px] sm:text-[15px] leading-relaxed max-w-sm">
+                The career command console for student developers. Built to accelerate recruitment pipelines and secure engineering opportunities.
+              </p>
+            </div>
+
+            <div>
+              <p className="text-white/25 text-[12px] mt-12 font-mono">
+                &copy; {new Date().getFullYear()} InternHQ Technologies Inc. All rights reserved.
+              </p>
+            </div>
+          </div>
+        </div>
+      </footer>
 
     </div>
   )
